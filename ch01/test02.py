@@ -2,6 +2,9 @@ import tensorflow as tf
 import numpy as np
 
 
+# import matplotlib as plt
+
+
 def add_layer(inputs, in_size, out_size, activation_function=None):
     """
     神经层函数
@@ -11,10 +14,22 @@ def add_layer(inputs, in_size, out_size, activation_function=None):
     :param activation_function:激励函数
     :return:
     """
-    Weights = tf.Variable(tf.random_normal([in_size, out_size]))
-    biases = tf.Variable(tf.zeros([1, out_size]) + 0.1)
-    Wx_plus_b = tf.matmul(inputs, Weights) + biases  # Wx_plus_b是神经网络未激活的值，tf.matmul()是矩阵的乘法
-
+    with tf.name_scope('layer'):
+        with tf.name_scope('Weights'):
+            Weights = tf.Variable(
+                tf.random_normal([in_size, out_size]),
+                name='W'
+            )
+        with tf.name_scope('biases'):
+            biases = tf.Variable(
+                tf.zeros([1, out_size]) + 0.1,
+                name='b'
+            )
+        with tf.name_scope('Wx_plus_b'):
+            # Wx_plus_b = tf.matmul(inputs, Weights) + biases  # Wx_plus_b是神经网络未激活的值，tf.matmul()是矩阵的乘法
+            Wx_plus_b = tf.add(
+                tf.matmul(inputs, Weights),
+                biases)   # Wx_plus_b是神经网络未激活的值，tf.matmul()是矩阵的乘法
     """
     当激励函数为空时，Wx_plus_b输出就是当前的预测值，
     不为None时候，就把Wx_plus_b传入到激励函数中去
@@ -22,7 +37,7 @@ def add_layer(inputs, in_size, out_size, activation_function=None):
     if activation_function is None:
         output = Wx_plus_b
     else:
-        output = activation_function(Wx_plus_b)
+        output = activation_function(Wx_plus_b,)
 
     return output
 
@@ -31,11 +46,12 @@ if __name__ == '__main__':
     # 1.准备数据
     x_data = np.linspace(-1, 1, 300, dtype=np.float32)[:, np.newaxis]
     noise = np.random.normal(0, 0.05, x_data.shape).astype(np.float32)
-    y_data = np.square(x_data) - 0.5 + noise
+    y_data = np.square(x_data) - 0.5 + noise  # 定义方程
 
     # 2.利用占位符定义我们所需的神经网络的输入
-    xs = tf.placeholder(tf.float32, [None, 1])
-    ys = tf.placeholder(tf.float32, [None, 1])
+    with tf.name_scope('inputs'):
+        xs = tf.placeholder(tf.float32, [None, 1], name='x_in')
+        ys = tf.placeholder(tf.float32, [None, 1], name='y_in')
 
     # 3.定义神经层（输入层、隐藏层、输出层）
     # 构建输入层1个，隐藏层10个，输出层1个的神经网络
@@ -45,11 +61,16 @@ if __name__ == '__main__':
     # 3.定义输出层（此时的输入就是隐藏层的输出——l1）
     prediction = add_layer(l1, 10, 1, activation_function=None)
 
-    loss = tf.reduce_mean(tf.reduce_sum(tf.square(ys - prediction),
-                                        reduction_indices=[1]))
+    with  tf.name_scope('loss'):
+        loss = tf.reduce_mean(
+            tf.reduce_sum(
+                tf.square(ys - prediction),
+                reduction_indices=[1])
+        )
 
     # 让机器学习提升它的准确率
-    train_step = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
+    with tf.name_scope('train'):
+        train_step = tf.train.GradientDescentOptimizer(0.1).minimize(loss)  # 梯度下降算法
 
     # 初始化变量
     init = tf.global_variables_initializer()
@@ -58,9 +79,24 @@ if __name__ == '__main__':
     # with tf.Session() as sess:
     #     sess.run(init)
     sess = tf.Session()
+    writer = tf.summary.FileWriter("logs/", tf.get_default_graph())
     sess.run(init)
-    # 训练
+    # 训练，并显示图像
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1, 1, 1)
+    # ax.scatter(x_data, y_data)
+    # plt.ion()  # 本次运行请注释，全局运行不要注释
+    # plt.show()
+
     for i in range(2000):
         sess.run(train_step, feed_dict={xs: x_data, ys: y_data})
         if i % 50 == 0:
-            print(sess.run(loss, feed_dict={xs: x_data, ys: y_data}))
+            # try:
+            #     ax.lines.remove(lines[0])
+            # except Exception:
+            #     pass
+            prediction_value = sess.run(prediction, feed_dict={xs: x_data})
+            # plot the prediction
+            # lines = ax.plot(x_data, prediction_value, 'r-', lw=5)
+            # plt.pause(0.1)
